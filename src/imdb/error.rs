@@ -34,6 +34,8 @@ pub enum Err {
   BasicsDbBuild,
   #[display(fmt = "Error querying the IMDB basics DB")]
   BasicsDbQuery,
+  #[display(fmt = "Short, invalid or empty keywords")]
+  BadKeywords,
 }
 
 impl Err {
@@ -55,6 +57,10 @@ impl Err {
 
   pub(crate) fn basics_db_query<T>() -> Res<T> {
     Err(Box::new(Err::BasicsDbQuery))
+  }
+
+  pub(crate) fn bad_keywords<T>() -> Res<T> {
+    Err(Box::new(Err::BadKeywords))
   }
 }
 

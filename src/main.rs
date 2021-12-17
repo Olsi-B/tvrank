@@ -29,8 +29,6 @@ use walkdir::WalkDir;
 enum TvRankErr {
   #[display(fmt = "Could not find cache directory")]
   CacheDir,
-  #[display(fmt = "Short, invalid or empty keywords")]
-  BadKeywords,
 }
 
 impl TvRankErr {
@@ -331,7 +329,7 @@ fn single_title<'a>(title: &str, imdb: &'a Imdb, imdb_url: &Url, sort_by_year: b
     (name, Some(year))
   } else {
     warn!("Going to use `{}` as keywords for search query", title);
-    let keywords_map = ImdbKeywordSet::try_from(title).map_err(|_| TvRankErr::BadKeywords)?;
+    let keywords_map = ImdbKeywordSet::new_query_keywordset(title)?;
     info!("Keywords: {}", keywords_map);
     keywords = Some(keywords_map);
     (title, None)

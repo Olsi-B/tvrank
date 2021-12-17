@@ -22,6 +22,7 @@ struct SeriesCookie(usize);
 type ById<C> = FnvHashMap<TitleId<'static>, C>;
 type ByYear<C> = FnvHashMap<Option<u16>, Vec<C>>;
 type ByTitle<C> = FnvHashMap<String, ByYear<C>>;
+type ByKeyword<C> = FnvHashMap<String, Vec<C>>;
 
 #[derive(Default, DeepSizeOf)]
 pub(crate) struct Basics {
@@ -31,6 +32,8 @@ pub(crate) struct Basics {
   movies_id: ById<MoviesCookie>,
   /// Map from movies names to years to movies.
   movies_titles: ByTitle<MoviesCookie>,
+  /// Map from keywords to movies.
+  movies_keywords: ByKeyword<MoviesCookie>,
 
   /// Series information.
   series: Vec<TitleBasics>,
@@ -38,6 +41,8 @@ pub(crate) struct Basics {
   series_id: ById<SeriesCookie>,
   /// Map from series names to years to series.
   series_titles: ByTitle<SeriesCookie>,
+  /// Map from keywords to series.
+  series_keywords: ByKeyword<SeriesCookie>,
 }
 
 impl Index<&MoviesCookie> for Basics {
@@ -242,16 +247,20 @@ impl Basics {
       let same_title = lc_primary_title == lc_original_title;
 
       if let Some(escaped_primary_title) = Self::escape_title(&lc_primary_title) {
+        Self::insert_title_keywords(&mut self.movies_keywords, cookie, &escaped_primary_title);
         Self::insert_title(&mut self.movies_titles, cookie, escaped_primary_title, start_year);
       }
 
+      Self::insert_title_keywords(&mut self.movies_keywords, cookie, &lc_primary_title);
       Self::insert_title(&mut self.movies_titles, cookie, lc_primary_title, start_year);
 
       if !same_title {
         if let Some(escaped_original_title) = Self::escape_title(&lc_original_title) {
+          Self::insert_title_keywords(&mut self.movies_keywords, cookie, &escaped_original_title);
           Self::insert_title(&mut self.movies_titles, cookie, escaped_original_title, start_year);
         }
 
+        Self::insert_title_keywords(&mut self.movies_keywords, cookie, &lc_original_title);
         Self::insert_title(&mut self.movies_titles, cookie, lc_original_title, start_year);
       }
     } else if title_type.is_series() {
@@ -266,16 +275,20 @@ impl Basics {
       let same_title = lc_primary_title == lc_original_title;
 
       if let Some(escaped_primary_title) = Self::escape_title(&lc_primary_title) {
+        Self::insert_title_keywords(&mut self.series_keywords, cookie, &escaped_primary_title);
         Self::insert_title(&mut self.series_titles, cookie, escaped_primary_title, start_year);
       }
 
+      Self::insert_title_keywords(&mut self.series_keywords, cookie, &lc_primary_title);
       Self::insert_title(&mut self.series_titles, cookie, lc_primary_title, start_year);
 
       if !same_title {
         if let Some(escaped_original_title) = Self::escape_title(&lc_original_title) {
+          Self::insert_title_keywords(&mut self.series_keywords, cookie, &escaped_original_title);
           Self::insert_title(&mut self.series_titles, cookie, escaped_original_title, start_year);
         }
 
+        Self::insert_title_keywords(&mut self.series_keywords, cookie, &lc_original_title);
         Self::insert_title(&mut self.series_titles, cookie, lc_original_title, start_year);
       }
     }
@@ -325,5 +338,35 @@ impl Basics {
         by_year.insert(year, vec![cookie]);
         by_year
       });
+  }
+
+  fn insert_title_keywords<C>(db: &mut ByKeyword<C>, cookie: C, title: &str)
+  where
+    C: From<usize> + Copy + Eq,
+  {
+    let keywords = KeywordSet::make_title_keywordset(title);
+    Self::insert_keywords(db, cookie, keywords);
+  }
+
+  fn insert_keywords<C>(db: &mut ByKeyword<C>, cookie: C, keywords: Vec<String>)
+  where
+    C: From<usize> + Copy + Eq,
+  {
+    keywords
+      .into_iter()
+      .for_each(|keyword| Self::insert_keyword(db, cookie, keyword))
+  }
+
+  fn insert_keyword<C>(db: &mut ByKeyword<C>, cookie: C, keyword: String)
+  where
+    C: From<usize> + Copy + Eq,
+  {
+    db.entry(keyword)
+      .and_modify(|cookies| {
+        if !cookies.contains(&cookie) {
+          cookies.push(cookie)
+        }
+      })
+      .or_insert_with(|| vec![cookie]);
   }
 }
